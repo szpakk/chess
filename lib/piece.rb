@@ -76,11 +76,12 @@ class Pawn < Piece
 end
 
 class Rook < Piece
-  attr_accessor :position
+  attr_accessor :position, :first_move
 
   def initialize(color, x, y)
     super(color)
     @position = [x, y]
+    @first_move = true
   end
 
   def potential_moves
@@ -89,6 +90,10 @@ class Rook < Piece
 
   def to_s
     return color == "white" ? "R" : "R".colorize(:red)
+  end
+
+  def first_move?
+    first_move
   end
 end
 
@@ -127,11 +132,12 @@ class Queen < Piece
 end
 
 class King < Piece
-  attr_accessor :position
+  attr_accessor :position, :first_move
 
   def initialize(color, y)
     super(color)
     @position = [4, y]
+    @first_move = true
   end
 
   def potential_moves
@@ -139,6 +145,10 @@ class King < Piece
              [x - 1, y + 1], [x - 1, y], [x - 1, y - 1], [x, y + 1]]
     moves.select! { |x, y| x.between?(0,7) && y.between?(0,7) }
     moves
+  end
+
+  def first_move?
+    first_move
   end
 
   def to_s
