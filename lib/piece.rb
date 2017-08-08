@@ -50,13 +50,13 @@ class Pawn < Piece
   end
 
   def potential_moves
-    moves = [[x, y + 1]] if color == 'white' && y < 8
+    moves = [[x, y + 1]] if color == 'white' && y < 7
     moves = [[x, y - 1]] if color == 'black' && y > 0
     moves << [x, y + 2] if color == 'white' && passant? 
     moves << [x, y - 2] if color == 'black' && passant?
-    moves << [x + 1, y + 1] if color == 'white' && x < 8
+    moves << [x + 1, y + 1] if color == 'white' && x < 7
     moves << [x - 1, y + 1] if color == 'white' && x > 0
-    moves << [x + 1, y - 1] if color == 'black' && x < 8
+    moves << [x + 1, y - 1] if color == 'black' && x < 7
     moves << [x - 1, y - 1] if color == 'black' && x > 0
     moves 
   end
@@ -137,7 +137,8 @@ class King < Piece
   def potential_moves
     moves = [[x + 1, y + 1], [x + 1, y], [x + 1, y - 1], [x, y + 1],
              [x - 1, y + 1], [x - 1, y], [x - 1, y - 1], [x, y + 1]]
-    moves.select { |x, y| x.between?(0,7) && y.between?(0,7) }
+    moves.select! { |x, y| x.between?(0,7) && y.between?(0,7) }
+    moves
   end
 
   def to_s

@@ -89,13 +89,15 @@ class Board
   end
 
   def is_move_checked?(x,y)
-    other_player.set.each { |piece| return true if is_move_possible?(piece, x, y)}
+    other_player.set.each do |piece|
+      return true if (!piece.is_a?(King) && is_move_possible?(piece, x, y)) || (piece.is_a?(King) && piece.potential_moves.include?([x, y]))
+    end
     false
   end
 
   def move(piece, x, y)
     if is_move_possible?(piece, x, y)
-      other_player.set.delete(board[y][x]) unless is_free?(x, y)
+      player1.set.delete(board[y][x]) || player2.set.delete(board[y][x]) unless is_free?(x, y)
       piece.position = [x, y]
     else
       false

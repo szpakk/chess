@@ -24,4 +24,8 @@ class Player
   def king_y
     set[0].y
   end
+
+  def self.count=(num)
+    @@count = num
+  end
 end
