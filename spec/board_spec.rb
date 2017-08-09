@@ -4,7 +4,6 @@ require 'spec_helper'
 describe Board do
   describe "#is_mate?" do
     before(:each) do
-      Player.count = 0
       @board = Board.new
       @board.create_players("player1", "player2")
     end

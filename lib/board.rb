@@ -1,5 +1,6 @@
 require_relative 'piece'
 require_relative 'player'
+require 'yaml'
 
 class Board
   attr_accessor :board, :player1, :player2, :current_player, :other_player, :current_piece
@@ -182,13 +183,14 @@ class Board
     puts "Enter name of the second player (black set): "
     p2_name = gets.chomp
     create_players(p1_name, p2_name)
-    create_board
-    update_board
-    draw_board
+
     game_controller
   end
 
   def game_controller
+    create_board
+    update_board
+    draw_board
     puts ""    
     until is_mate?
       puts "It's #{current_player.name}'s turn."
@@ -237,7 +239,32 @@ class Board
     y = position[1].to_i - 1
     [x, y]
   end
-end
 
-board = Board.new
-board.start_game
+  def save_game
+    Dir.mkdir('sav') unless Dir.exist?('sav')
+    save_file = File.open('sav/save.yaml', "w")
+    yaml = YAML::dump({
+      :player1 => @player1,
+      :player2 => @player2,
+      :current_player => @current_player,
+      :other_player => @other_player
+    })
+    save_file << yaml
+    save_file.close
+  end
+
+  def load_game
+    if File.exist?("sav/save.yaml")
+      data = File.read("sav/save.yaml")
+      data = YAML::load(data)
+    else
+      puts "There are no saves. Starting new game"
+      return new_game
+    end
+    @player1 = data[:player1]
+    @player2 = data[:player2]
+    @current_player = data[:current_player]
+    @other_player = data[:other_player]
+    game_controller
+  end
+end

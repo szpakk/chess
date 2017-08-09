@@ -1,5 +1,3 @@
-require_relative 'piece'
-
 class Player
   @@count = 0
 
@@ -8,7 +6,7 @@ class Player
 
   def initialize(name)
     @name = name
-    @color = @@count == 0 ? 'white' : 'black'
+    @color = @@count.even? ? 'white' : 'black'
     y = @color == 'white' ? 0 : 7
     @@count += 1
     @set = [King.new(@color, y), Queen.new(@color, y), Rook.new(@color, 0, y),
@@ -23,9 +21,5 @@ class Player
 
   def king_y
     set[0].y
-  end
-
-  def self.count=(num)
-    @@count = num
   end
 end
