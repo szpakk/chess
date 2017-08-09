@@ -187,6 +187,38 @@ class Board
     game_controller
   end
 
+  def parse_command
+    command = gets.chomp
+    until command.downcase == 'quit' || command.downcase == 'save' || command.downcase =~ /^[a-h][1-8]$/
+      print "Invalid command! Try again: "
+      command = gets.chomp
+    end
+    command.downcase
+  end
+
+  def parse_piece
+    until current_piece.is_a?(Piece) && current_piece.color == current_player.color
+      print "Invalid piece. Try again or type 'back' to return: "
+      command = gets.chomp
+      return game_controller if command.downcase == 'back'
+      x, y = parse_choice(command.downcase)
+      choose_piece(x, y)
+    end
+  end
+
+  def parse_move
+    print "Choose move or type 'back' to choose other piece: "
+    move_choice = gets.chomp
+    return game_controller if move_choice.downcase == 'back'
+    x, y = parse_choice(move_choice.downcase)
+    until move_choice.downcase =~ /^[a-h][1-8]$/ && move(current_piece, x, y) != false
+      print "Invalid move! Try again or type 'back' to return: "
+      move_choice = gets.chomp
+      return game_controller if move_choice.downcase == 'back'
+      x, y = parse_choice(move_choice.downcase)
+    end
+  end
+
   def game_controller
     create_board
     update_board
@@ -195,41 +227,26 @@ class Board
     until is_mate?
       puts "It's #{current_player.name}'s turn."
       print "Choose piece, type 'save' to save game or 'quit' to exit: "
-      command = gets.chomp
-      until command.downcase == 'quit' || command.downcase == 'save' || command.downcase =~ /^[a-h][1-8]$/
-        print "Invalid command! Try again: "
-        command = gets.chomp
+      command = parse_command
+      if command == 'save'
+        begin
+          save_game
+          puts "Game saved successfully!"
+        rescue
+          puts "Unable to save the game!"
+        end
+        return game_controller
       end
-      if command.downcase == 'save'
-        save_game
-        puts "Game saved successfully"
-        game_controller
-      end
-      exit if command.downcase == 'quit'
-      x, y = parse_choice(command.downcase)
+      exit if command == 'quit'
+      x, y = parse_choice(command)
       choose_piece(x, y)
-      until current_piece.is_a?(Piece) && current_piece.color == current_player.color
-        print "Invalid piece. Try again or type 'back' to return: "
-        command = gets.chomp
-        return game_controller if command.downcase == 'back'
-        x, y = parse_choice(command.downcase)
-        choose_piece(x, y)
-      end
-      print "Choose move or type 'back' to choose other piece: "
-      move_choice = gets.chomp
-      return game_controller if move_choice.downcase == 'back'
-      x, y = parse_choice(move_choice.downcase)
-      until move_choice.downcase =~ /^[a-h][1-8]$/ && move(current_piece, x, y) != false
-        print "Invalid move! Try again or type 'back' to return: "
-        move_choice = gets.chomp
-        return game_controller if move_choice.downcase == 'back'
-        x, y = parse_choice(move_choice.downcase)
-      end
+      parse_piece
+      parse_move
       update_board
       draw_board
       print "\nCheck" if is_check?
       print "mate!" if is_mate?
-      print "\n"
+      puts ""
       self.current_player, self.other_player = self.other_player, self.current_player
     end
   end
