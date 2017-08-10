@@ -1,26 +1,37 @@
 require_relative 'piece'
 require_relative 'player'
+require 'colorize'
 require 'yaml'
 
 class Board
-  attr_accessor :board, :player1, :player2, :current_player, :other_player, :current_piece
+  attr_accessor :board, :player1, :player2, :current_player, :other_player, :current_piece, :rescue_moves, :last_move, :passant
+
+  def initialize
+    @rescue_moves = []
+    @passant = false
+  end
 
   def create_board
     board = []
-    8.times { board << [" ", " ", " ", " ", " ", " ", " ", " "] }
+    even_line = ["   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue),
+                  "   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue),
+                  "   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue),
+                  "   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue)]
+    odd_line = even_line.reverse
+    8.times { |i| i.even? ? board << even_line[0..-1] : board << odd_line[0..-1] }
     board
   end
 
   def draw_board
-    puts "\n  a b c d e f g h"
+    puts "\n   a  b  c  d  e  f  g  h "
     board.reverse.each_with_index do |row, index|
-      puts "#{8 - index} #{row[0]} #{row[1]} #{row[2]} #{row[3]} #{row[4]} #{row[5]} #{row[6]} #{row[7]} #{8 - index}"
+      puts "#{8 - index}|#{row[0]}#{row[1]}#{row[2]}#{row[3]}#{row[4]}#{row[5]}#{row[6]}#{row[7]}|#{8 - index}"
     end
-    puts "  a b c d e f g h"
+    puts "   a  b  c  d  e  f  g  h "
   end
 
   def is_free?(x,y)
-    return board[y][x] == " " ? true : false
+    return !board[y][x].is_a?(Piece)
   end
 
   def create_players(name1, name2)
@@ -40,7 +51,13 @@ class Board
     @current_piece = board[y][x]
   end
 
+  def log_last_move(piece, x, y)
+    @last_move = {:piece => piece, :x => x, :y => y }
+  end
+
   def is_move_possible?(piece, x, y)
+    passant = false
+    return false unless rescue_moves.empty? || rescue_moves.include?([x, y])
     return false unless piece.potential_moves.include?([x, y]) && (is_free?(x, y) || board[y][x].color != piece.color)
     return true if piece.is_a?(Knight)
     return true if piece.is_a?(King) && !is_move_checked?(x,y)
@@ -48,9 +65,17 @@ class Board
     return is_diagonal_possible?(piece, x, y) if piece.is_a?(Bishop)
     return is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x) || is_diagonal_possible?(piece, x, y) if piece.is_a?(Queen)
     if piece.is_a?(Pawn)
-      return true if x == piece.x && is_free?(x, y) && is_vertical_possible?(piece, y)
-      return true unless is_free?(x, y) || x == piece.x
-      false
+      if x == piece.x && is_free?(x, y) && is_vertical_possible?(piece, y)
+        last_move = log_last_move(piece, x, y) if (piece.y - y).abs == 2
+        return true 
+      elsif !self.last_move.nil? && self.last_move[:y] == piece.y && (piece.x - self.last_move[:x]).abs == 1 && is_free?(x, y)
+        self.passant = true
+        return true
+      elsif !is_free?(x, y) && x != piece.x
+        return true
+      else
+        return false
+     end
     end
   end
 
@@ -120,13 +145,15 @@ class Board
 
   def promote_pawn(piece)
     player = player1.color == piece.color ? player1 : player2
-    player.set << Queen.new(color, piece.x, piece.y)
+    player.set << Queen.new(piece.color, piece.y)
+    player.set[-1].position = [piece.x, piece.y]
     player.set.delete(board[piece.y][piece.x])
   end
 
   def move(piece, x, y)
     if is_move_possible?(piece, x, y)
       player1.set.delete(board[y][x]) || player2.set.delete(board[y][x]) unless is_free?(x, y)
+      (player1.set.delete(board[last_move[:y]][last_move[:x]]) || player2.set.delete(board[last_move[:y]][last_move[:x]])) && self.passant = false if self.passant
       piece.position = [x, y]
       update_board
       if possible_castling?(piece, x, y)
@@ -134,6 +161,7 @@ class Board
       end
       piece.first_move = false if piece.is_a?(Rook) || piece.is_a?(King)
       promote_pawn(piece) if piece.is_a?(Pawn) && piece.promotion?
+      true
     else
       false
     end
@@ -147,19 +175,23 @@ class Board
   end
 
   def is_mate?
-    current_set_copy = current_player.set[0..-1]
-    other_set_copy = other_player.set[0..-1]
-    other_player.set.each do |piece|
-      piece.potential_moves.each do |x, y|
-        move(piece, x, y)
+    current_set_copy = YAML::dump(current_player.set)
+    other_set_copy = YAML::dump(other_player.set)
+    mate = true
+    other_player.set.size.times do |i|
+      other_player.set[i].potential_moves.each do |x, y|
+        move(other_player.set[i], x, y)
         update_board
-        return false unless is_check?
-        other_player.set = other_set_copy
-        current_player.set = current_set_copy
+        unless is_check?
+          rescue_moves << [x, y]
+          mate = false
+        end
+        other_player.set = YAML::load(other_set_copy)
+        current_player.set = YAML::load(current_set_copy)
         update_board
       end
     end
-    true
+    mate
   end
 
   def start_game
@@ -224,7 +256,7 @@ class Board
     update_board
     draw_board
     puts ""    
-    until is_mate?
+    loop do
       puts "It's #{current_player.name}'s turn."
       print "Choose piece, type 'save' to save game or 'quit' to exit: "
       command = parse_command
@@ -244,9 +276,15 @@ class Board
       parse_move
       update_board
       draw_board
+      rescue_moves = []
       print "\nCheck" if is_check?
-      print "mate!" if is_mate?
-      puts ""
+      if is_mate?
+        puts "mate!"
+        exit
+      end 
+      puts is_check? ? "!" : ""
+      rescue_moves = [] unless is_check?
+      self.last_move = nil unless !last_move.nil? && last_move[:piece].color ==  current_player.color
       self.current_player, self.other_player = self.other_player, self.current_player
     end
   end
@@ -264,7 +302,10 @@ class Board
       :player1 => @player1,
       :player2 => @player2,
       :current_player => @current_player,
-      :other_player => @other_player
+      :other_player => @other_player,
+      :rescue_moves => @rescue_moves,
+      :last_move => @last_move,
+      :passant => @passant
     })
     save_file << yaml
     save_file.close
@@ -282,6 +323,9 @@ class Board
     @player2 = data[:player2]
     @current_player = data[:current_player]
     @other_player = data[:other_player]
+    @rescue_moves = data[:rescue_moves]
+    @last_move = data[:last_move]
+    @passant = data[:passant]
     game_controller
   end
 end

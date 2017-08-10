@@ -17,11 +17,11 @@ class Piece
 
   def diagonal_moves
     moves = []
-    7.times do |i|
+    1.upto(7) do |i|
       y_pos = y + i
       x_pos = x + i
       y_neg = y - i
-      x_neg = x - i 
+      x_neg = x - i
       moves << [x_pos, y_pos] if x_pos.between?(0,7) && y_pos.between?(0,7)
       moves << [x_neg, y_pos] if x_neg.between?(0,7) && y_pos.between?(0,7)
       moves << [x_neg, y_neg] if x_neg.between?(0,7) && y_neg.between?(0,7)
@@ -38,22 +38,28 @@ class Piece
     end
     moves
   end
+
+  def colors
+    background = (self.x + self.y).odd? ? :light_blue : :blue
+    piece_color = color == 'white' ? :white : :black
+    {:color => piece_color, :background => background}
+  end
 end
 
 class Pawn < Piece
-  attr_accessor :passant, :position
+  attr_accessor :first_step, :position
 
   def initialize(color, x, y)
     super(color)
     @position = [x, y]
-    @passant = position
+    @first_step = position
   end
 
   def potential_moves
     moves = [[x, y + 1]] if color == 'white' && y < 7
     moves = [[x, y - 1]] if color == 'black' && y > 0
-    moves << [x, y + 2] if color == 'white' && passant? 
-    moves << [x, y - 2] if color == 'black' && passant?
+    moves << [x, y + 2] if color == 'white' && first_step? 
+    moves << [x, y - 2] if color == 'black' && first_step?
     moves << [x + 1, y + 1] if color == 'white' && x < 7
     moves << [x - 1, y + 1] if color == 'white' && x > 0
     moves << [x + 1, y - 1] if color == 'black' && x < 7
@@ -61,8 +67,8 @@ class Pawn < Piece
     moves 
   end
 
-  def passant?
-    passant == position
+  def first_step?
+    first_step == position
   end
 
   def promotion?
@@ -71,7 +77,7 @@ class Pawn < Piece
   end
 
   def to_s
-    return color == "white" ? "P" : "P".colorize(:red)
+    " \u265F ".colorize(colors)
   end
 end
 
@@ -89,7 +95,7 @@ class Rook < Piece
   end
 
   def to_s
-    return color == "white" ? "R" : "R".colorize(:red)
+    " \u265C ".colorize(colors)
   end
 
   def first_move?
@@ -110,7 +116,7 @@ class Bishop < Piece
   end
 
   def to_s
-    return color == "white" ? "B" : "B".colorize(:red)
+    " \u265D ".colorize(colors)
   end
 end
 
@@ -127,7 +133,7 @@ class Queen < Piece
   end
 
   def to_s
-    return color == "white" ? "Q" : "Q".colorize(:red)
+    " \u265B ".colorize(colors)
   end
 end
 
@@ -152,7 +158,7 @@ class King < Piece
   end
 
   def to_s
-    return color == "white" ? "K" : "K".colorize(:red)
+    " \u265A ".colorize(colors)
   end
 end
 
@@ -171,6 +177,6 @@ class Knight < Piece
   end
 
   def to_s
-    return color == "white" ? "N" : "N".colorize(:red)
+    " \u265E ".colorize(colors)
   end
 end
