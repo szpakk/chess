@@ -4,7 +4,8 @@ require 'colorize'
 require 'yaml'
 
 class Board
-  attr_accessor :board, :player1, :player2, :current_player, :other_player, :current_piece, :rescue_moves, :last_move, :passant
+  attr_accessor :board, :player1, :player2, :current_player, :other_player, :current_piece,
+                :rescue_moves, :last_move, :passant, :temp_piece, :temp_x, :temp_y
 
   def initialize
     @rescue_moves = []
@@ -28,7 +29,7 @@ class Board
     puts "   a  b  c  d  e  f  g  h "
   end
 
-  def is_free?(x,y)
+  def is_free?(x, y)
     return !board[y][x].is_a?(Piece)
   end
 
@@ -49,51 +50,51 @@ class Board
     @current_piece = board[y][x]
   end
 
-  def log_last_move(piece, x, y)
-    @last_move = {:piece => piece, :x => x, :y => y }
+  def log_last_move
+    @last_move = {:piece => temp_piece, :x => temp_x, :y => temp_y }
   end
 
-  def no_check_or_rescue_move(x, y)
-    rescue_moves.empty? || rescue_moves.include?([x, y])
+  def no_check_or_rescue_move
+    rescue_moves.empty? || rescue_moves.include?([temp_x, temp_y])
   end
 
-  def not_occupied_by_same_player(piece, x, y)
-    piece.potential_moves.include?([x, y]) &&
-      (is_free?(x, y) || board[y][x].color != piece.color)
+  def not_occupied_by_same_player
+    temp_piece.potential_moves.include?([temp_x, temp_y]) &&
+      (is_free?(temp_x, temp_y) || board[temp_y][temp_x].color != temp_piece.color)
   end
 
-  def safe_king_move(piece, x, y)
-    piece.is_a?(King) && !is_move_checked?(x,y)
+  def safe_king_move
+    temp_piece.is_a?(King) && !is_move_checked?(temp_x, temp_y)
   end
 
-  def valid_knight_move(piece, x, y)
-    piece.is_a?(Knight)
+  def valid_knight_move
+    temp_piece.is_a?(Knight)
   end
 
-  def valid_rook_move(piece, x, y)
-    piece.is_a?(Rook) && (is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x))
+  def valid_rook_move
+    temp_piece.is_a?(Rook) && (is_vertical_possible? || is_horizontal_possible?)
   end
 
-  def valid_bishop_move(piece, x, y)
-    piece.is_a?(Bishop) && is_diagonal_possible?(piece, x, y)
+  def valid_bishop_move
+    temp_piece.is_a?(Bishop) && is_diagonal_possible?
   end
 
-  def valid_queen_move(piece, x, y)
-    piece.is_a?(Queen) && (is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x) || is_diagonal_possible?(piece, x, y))
+  def valid_queen_move
+    temp_piece.is_a?(Queen) && (is_vertical_possible? || is_horizontal_possible? || is_diagonal_possible?)
   end
 
-  def vertical_pawn_move(piece, x, y)
-    if x == piece.x && is_free?(x, y) && is_vertical_possible?(piece, y)
-      self.last_move = log_last_move(piece, x, y) if (piece.y - y).abs == 2
+  def vertical_pawn_move
+    if temp_x == temp_piece.x && is_free?(temp_x, temp_y) && is_vertical_possible?
+      self.last_move = log_last_move if (temp_piece.y - temp_y).abs == 2
       true
     else
       false
     end
   end
 
-  def pawn_passant_take(piece, x, y)
-    if !self.last_move.nil? && self.last_move[:y] == piece.y &&
-      (piece.x - self.last_move[:x]).abs == 1 && is_free?(x, y)
+  def pawn_passant_take
+    if !self.last_move.nil? && self.last_move[:y] == temp_piece.y &&
+      (temp_piece.x - self.last_move[:x]).abs == 1 && is_free?(temp_x, temp_y)
       self.passant = true
       true
     else
@@ -101,69 +102,70 @@ class Board
     end
   end
 
-  def pawn_normal_take(piece, x, y)
-    !is_free?(x, y) && x != piece.x
+  def pawn_normal_take
+    !is_free?(temp_x, temp_y) && temp_x != temp_piece.x
   end
 
 
-  def valid_pawn_move(piece, x, y)
+  def valid_pawn_move
     self.passant = false
-    piece.is_a?(Pawn) &&
-      (vertical_pawn_move(piece, x, y) || pawn_passant_take(piece, x, y) || pawn_normal_take(piece, x, y))
+    temp_piece.is_a?(Pawn) &&
+      (vertical_pawn_move || pawn_passant_take || pawn_normal_take)
   end
 
-  def is_move_possible?(piece, x, y)
-    no_check_or_rescue_move(x, y) && not_occupied_by_same_player(piece, x, y) &&
-      (valid_knight_move(piece, x, y) || safe_king_move(piece, x, y) ||
-       valid_rook_move(piece, x, y) || valid_bishop_move(piece, x, y) ||
-       valid_queen_move(piece, x, y) || valid_pawn_move(piece, x, y))
+  def is_move_possible?
+    no_check_or_rescue_move && not_occupied_by_same_player &&
+      (valid_knight_move || safe_king_move || valid_rook_move ||
+       valid_bishop_move || valid_queen_move || valid_pawn_move)
   end
 
-  def is_vertical_possible?(piece, y)
-    if piece.y < y
-      (piece.y + 1).upto(y - 1) { |i| return false unless is_free?(piece.x, i) }
+  def is_vertical_possible?
+    if temp_piece.y < temp_y
+      (temp_piece.y + 1).upto(temp_y - 1) { |row| return false unless is_free?(temp_piece.x, row) }
       true
-    elsif piece.y > y
-      (piece.y - 1).downto(y + 1) { |i| return false unless is_free?(piece.x, i) }
-      true
-    else
-      false
-    end    
-  end
-
-  def is_horizontal_possible?(piece, x)
-    if piece.x < x
-      (piece.x + 1).upto(x - 1) { |i| return false unless is_free?(i, piece.y) }
-      true
-    elsif piece.x > x
-      (piece.x - 1).downto(x + 1) { |i| return false unless is_free?(i, piece.y) }
+    elsif temp_piece.y > temp_y
+      (temp_piece.y - 1).downto(temp_y + 1) { |row| return false unless is_free?(temp_piece.x, row) }
       true
     else
       false
     end    
   end
 
-  def is_diagonal_possible?(piece, x, y)
-      x_pos, y_pos = piece.x, piece.y
-      iterations = (piece.x - x).abs - 1
-      iterations.times do |i|
-        x_pos = piece.x < x ? x_pos + 1 : x_pos - 1
-        y_pos = piece.y < y ? y_pos + 1 : y_pos - 1
+  def is_horizontal_possible?
+    if temp_piece.x < temp_x
+      (temp_piece.x + 1).upto(temp_x - 1) { |column| return false unless is_free?(column, temp_piece.y) }
+      true
+    elsif temp_piece.x > temp_x
+      (temp_piece.x - 1).downto(temp_x + 1) { |column| return false unless is_free?(column, temp_piece.y) }
+      true
+    else
+      false
+    end    
+  end
+
+  def is_diagonal_possible?
+      x_pos, y_pos = temp_piece.x, temp_piece.y
+      iterations = (temp_piece.x - temp_x).abs - 1
+      iterations.times do
+        x_pos = temp_piece.x < temp_x ? x_pos + 1 : x_pos - 1
+        y_pos = temp_piece.y < temp_y ? y_pos + 1 : y_pos - 1
         return false unless is_free?(x_pos, y_pos)
       end
-      (piece.x - x).abs == (piece.y - y).abs
+      (temp_piece.x - temp_x).abs == (temp_piece.y - temp_y).abs
   end
 
   def is_move_checked?(x, y)
     other_player.set.each do |piece|
-      return true if (!piece.is_a?(King) && is_move_possible?(piece, x, y)) || (piece.is_a?(King) && piece.potential_moves.include?([x, y]))
+      self.temp_piece = piece
+      self.temp_x, self.temp_y = x, y
+      return true if !piece.is_a?(King) && is_move_possible? || (piece.is_a?(King) && piece.potential_moves.include?([x, y]))
     end
     false
   end
 
-  def possible_castling?(piece, x, y)
-    piece.is_a?(Rook) && piece.first_move? &&
-      ((piece.x == 3 && x == 3 && !is_move_checked?(2, y)) || (piece.x == 5 && x == 5 && !is_move_checked?(6, y)))
+  def possible_castling?
+    temp_piece.is_a?(Rook) && temp_piece.first_move? &&
+      ((temp_piece.x == 3 && temp_x == 3 && !is_move_checked?(2, temp_y)) || (temp_piece.x == 5 && temp_x == 5 && !is_move_checked?(6, temp_y)))
   end
 
   def castling(side)
@@ -185,27 +187,28 @@ class Board
     king.first_move = false
   end
 
-  def promote_pawn(piece)
-    player = player1.color == piece.color ? player1 : player2
-    player.set << Queen.new(piece.color, piece.y)
-    player.set[-1].position = [piece.x, piece.y]
-    player.set.delete(board[piece.y][piece.x])
+  def promote_pawn
+    player = player1.color == temp_piece.color ? player1 : player2
+    player.set << Queen.new(temp_piece.color, temp_piece.y)
+    player.set[-1].position = [temp_piece.x, temp_piece.y]
+    player.set.delete(board[temp_piece.y][temp_piece.x])
   end
 
-  def takeover(piece, x, y)
-    player1.set.delete(board[y][x]) || player2.set.delete(board[y][x]) unless is_free?(x, y)
+  def takeover
+    player1.set.delete(board[temp_y][temp_x]) ||
+      player2.set.delete(board[temp_y][temp_x]) unless is_free?(temp_x, temp_y)
     (player1.set.delete(board[last_move[:y]][last_move[:x]]) ||
       player2.set.delete(board[last_move[:y]][last_move[:x]])) &&
       self.passant = false if self.passant && self.last_move
   end
 
-  def move(piece, x, y)
-    if is_move_possible?(piece, x, y)
-      takeover(piece, x, y)
-      piece.position = [x, y]
-      castling(x) if possible_castling?(piece, x, y)      
-      piece.first_move = false if piece.is_a?(Rook) || piece.is_a?(King)
-      promote_pawn(piece) if piece.is_a?(Pawn) && piece.promotion?
+  def move
+    if is_move_possible?
+      takeover
+      temp_piece.position = [temp_x, temp_y]
+      castling(temp_x) if possible_castling?      
+      temp_piece.first_move = false if temp_piece.is_a?(Rook) || temp_piece.is_a?(King)
+      promote_pawn if temp_piece.is_a?(Pawn) && temp_piece.promotion?
       true
     else
       false
@@ -213,8 +216,10 @@ class Board
   end
 
   def is_check?
+    self.temp_x, self.temp_y = other_player.king_x, other_player.king_y
     current_player.set.each do |piece|
-      return true if is_move_possible?(piece, other_player.king_x, other_player.king_y)
+      self.temp_piece = piece
+      return true if is_move_possible?
     end
     false
   end
@@ -227,9 +232,11 @@ class Board
     mate = true
 
     # checking if any opponent move can prevent mate
-    other_player.set.size.times do |i|
-      other_player.set[i].potential_moves.each do |x, y|
-        move(other_player.set[i], x, y)
+    other_player.set.size.times do |index|
+      other_player.set[index].potential_moves.each do |x, y|
+        self.temp_piece = other_player.set[index]
+        self.temp_x, self.temp_y = x, y
+        move
         update_board
         unless is_check?
           return false unless check 
@@ -270,8 +277,9 @@ class Board
     print "Choose move or type 'back' to choose another piece: "
     move_choice = gets.chomp.downcase
     return game_controller if move_choice == 'back'
-    x, y = parse_position(move_choice)
-    until move_choice =~ /^[a-h][1-8]$/ && move(current_piece, x, y) != false
+    self.temp_x, self.temp_y = parse_position(move_choice)
+    self.temp_piece = current_piece
+    until move_choice =~ /^[a-h][1-8]$/ && move != false
       print "Invalid move! Try again or type 'back' to return: "
       move_choice = gets.chomp.downcase
       return game_controller if move_choice == 'back'
