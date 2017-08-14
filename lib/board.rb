@@ -13,12 +13,10 @@ class Board
 
   def create_board
     board = []
-    even_line = ["   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue),
-                  "   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue),
-                  "   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue),
-                  "   ".colorize(:background => :blue), "   ".colorize(:background => :light_blue)]
+    spacing = "   "
+    even_line = Array.new(4, [spacing.colorize(:background => :blue), spacing.colorize(:background => :light_blue)]).flatten
     odd_line = even_line.reverse
-    8.times { |i| i.even? ? board << even_line[0..-1] : board << odd_line[0..-1] }
+    8.times { |index| index.even? ? board << even_line[0..-1] : board << odd_line[0..-1] }
     board
   end
 
@@ -55,28 +53,70 @@ class Board
     @last_move = {:piece => piece, :x => x, :y => y }
   end
 
-  def is_move_possible?(piece, x, y)
-    passant = false
-    return false unless rescue_moves.empty? || rescue_moves.include?([x, y])
-    return false unless piece.potential_moves.include?([x, y]) && (is_free?(x, y) || board[y][x].color != piece.color)
-    return true if piece.is_a?(Knight)
-    return true if piece.is_a?(King) && !is_move_checked?(x,y)
-    return is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x) if piece.is_a?(Rook)
-    return is_diagonal_possible?(piece, x, y) if piece.is_a?(Bishop)
-    return is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x) || is_diagonal_possible?(piece, x, y) if piece.is_a?(Queen)
-    if piece.is_a?(Pawn)
-      if x == piece.x && is_free?(x, y) && is_vertical_possible?(piece, y)
-        last_move = log_last_move(piece, x, y) if (piece.y - y).abs == 2
-        return true 
-      elsif !self.last_move.nil? && self.last_move[:y] == piece.y && (piece.x - self.last_move[:x]).abs == 1 && is_free?(x, y)
-        self.passant = true
-        return true
-      elsif !is_free?(x, y) && x != piece.x
-        return true
-      else
-        return false
-     end
+  def no_check_or_rescue_move(x, y)
+    rescue_moves.empty? || rescue_moves.include?([x, y])
+  end
+
+  def not_occupied_by_same_player(piece, x, y)
+    piece.potential_moves.include?([x, y]) &&
+      (is_free?(x, y) || board[y][x].color != piece.color)
+  end
+
+  def safe_king_move(piece, x, y)
+    piece.is_a?(King) && !is_move_checked?(x,y)
+  end
+
+  def valid_knight_move(piece, x, y)
+    piece.is_a?(Knight)
+  end
+
+  def valid_rook_move(piece, x, y)
+    piece.is_a?(Rook) && (is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x))
+  end
+
+  def valid_bishop_move(piece, x, y)
+    piece.is_a?(Bishop) && is_diagonal_possible?(piece, x, y)
+  end
+
+  def valid_queen_move(piece, x, y)
+    piece.is_a?(Queen) && (is_vertical_possible?(piece, y) || is_horizontal_possible?(piece, x) || is_diagonal_possible?(piece, x, y))
+  end
+
+  def vertical_pawn_move(piece, x, y)
+    if x == piece.x && is_free?(x, y) && is_vertical_possible?(piece, y)
+      self.last_move = log_last_move(piece, x, y) if (piece.y - y).abs == 2
+      true
+    else
+      false
     end
+  end
+
+  def pawn_passant_take(piece, x, y)
+    if !self.last_move.nil? && self.last_move[:y] == piece.y &&
+      (piece.x - self.last_move[:x]).abs == 1 && is_free?(x, y)
+      self.passant = true
+      true
+    else
+      false
+    end
+  end
+
+  def pawn_normal_take(piece, x, y)
+    !is_free?(x, y) && x != piece.x
+  end
+
+
+  def valid_pawn_move(piece, x, y)
+    self.passant = false
+    piece.is_a?(Pawn) &&
+      (vertical_pawn_move(piece, x, y) || pawn_passant_take(piece, x, y) || pawn_normal_take(piece, x, y))
+  end
+
+  def is_move_possible?(piece, x, y)
+    no_check_or_rescue_move(x, y) && not_occupied_by_same_player(piece, x, y) &&
+      (valid_knight_move(piece, x, y) || safe_king_move(piece, x, y) ||
+       valid_rook_move(piece, x, y) || valid_bishop_move(piece, x, y) ||
+       valid_queen_move(piece, x, y) || valid_pawn_move(piece, x, y))
   end
 
   def is_vertical_possible?(piece, y)
@@ -111,10 +151,10 @@ class Board
         y_pos = piece.y < y ? y_pos + 1 : y_pos - 1
         return false unless is_free?(x_pos, y_pos)
       end
-      true
+      (piece.x - x).abs == (piece.y - y).abs
   end
 
-  def is_move_checked?(x,y)
+  def is_move_checked?(x, y)
     other_player.set.each do |piece|
       return true if (!piece.is_a?(King) && is_move_possible?(piece, x, y)) || (piece.is_a?(King) && piece.potential_moves.include?([x, y]))
     end
@@ -128,19 +168,21 @@ class Board
 
   def castling(side)
     print "Do you want to perform castling? Type 'y' or 'n': "
-    answer = gets.chomp
-    until answer.downcase == 'y' || answer.downcase == 'n'
+    answer = gets.chomp.downcase
+    until answer == 'y' || answer == 'n'
       print "Invalid command. Type 'y' or 'n': "
-      answer = gets.chomp
+      answer = gets.chomp.downcase
     end
-    if answer == 'y'
-      y = current_player.king_y
-      x = current_player.king_x
-      new_x = side == 3 ? 2 : 6
-      king = board[y][x]
-      king.position = [new_x, y]
-      king.first_move = false
-    end
+    accept_castling(side) if answer == 'y'
+  end
+
+  def accept_castling(side)
+    y = current_player.king_y
+    x = current_player.king_x
+    new_x = side == 3 ? 2 : 6
+    king = board[y][x]
+    king.position = [new_x, y]
+    king.first_move = false
   end
 
   def promote_pawn(piece)
@@ -150,15 +192,18 @@ class Board
     player.set.delete(board[piece.y][piece.x])
   end
 
+  def takeover(piece, x, y)
+    player1.set.delete(board[y][x]) || player2.set.delete(board[y][x]) unless is_free?(x, y)
+    (player1.set.delete(board[last_move[:y]][last_move[:x]]) ||
+      player2.set.delete(board[last_move[:y]][last_move[:x]])) &&
+      self.passant = false if self.passant && self.last_move
+  end
+
   def move(piece, x, y)
     if is_move_possible?(piece, x, y)
-      player1.set.delete(board[y][x]) || player2.set.delete(board[y][x]) unless is_free?(x, y)
-      (player1.set.delete(board[last_move[:y]][last_move[:x]]) || player2.set.delete(board[last_move[:y]][last_move[:x]])) && self.passant = false if self.passant
+      takeover(piece, x, y)
       piece.position = [x, y]
-      update_board
-      if possible_castling?(piece, x, y)
-        castling(x)
-      end
+      castling(x) if possible_castling?(piece, x, y)      
       piece.first_move = false if piece.is_a?(Rook) || piece.is_a?(King)
       promote_pawn(piece) if piece.is_a?(Pawn) && piece.promotion?
       true
@@ -175,17 +220,24 @@ class Board
   end
 
   def is_mate?
+    check = is_check?
+    # performing a deep copy of user set
     current_set_copy = YAML::dump(current_player.set)
     other_set_copy = YAML::dump(other_player.set)
     mate = true
+
+    # checking if any opponent move can prevent mate
     other_player.set.size.times do |i|
       other_player.set[i].potential_moves.each do |x, y|
         move(other_player.set[i], x, y)
         update_board
         unless is_check?
+          return false unless check 
           rescue_moves << [x, y]
           mate = false
         end
+
+        # restoring original sets
         other_player.set = YAML::load(other_set_copy)
         current_player.set = YAML::load(current_set_copy)
         update_board
@@ -194,32 +246,8 @@ class Board
     mate
   end
 
-  def start_game
-    puts "Welcome to the Chess Game!"
-    puts "Type:\n  'start' to start new game\n  'load' to load saved game\n  'quit' to exit"
-    commands = ['start', 'load', 'quit']
-    print ">> "
-    command = gets.chomp
-    until commands.include?(command.downcase)
-      print "Invalid command. Try again: "
-      command = gets.chomp
-    end
-    new_game if command.downcase == 'start'
-    load_game if command.downcase == 'load'
-    exit if command.downcase == 'quit'
-  end
-
-  def new_game
-    puts "Enter name of the first player (white set): "
-    p1_name = gets.chomp
-    puts "Enter name of the second player (black set): "
-    p2_name = gets.chomp
-    create_players(p1_name, p2_name)
-
-    game_controller
-  end
-
   def parse_command
+    print "Choose piece, type 'save' to save game or 'quit' to exit: "
     command = gets.chomp
     until command.downcase == 'quit' || command.downcase == 'save' || command.downcase =~ /^[a-h][1-8]$/
       print "Invalid command! Try again: "
@@ -231,24 +259,91 @@ class Board
   def parse_piece
     until current_piece.is_a?(Piece) && current_piece.color == current_player.color
       print "Invalid piece. Try again or type 'back' to return: "
-      command = gets.chomp
-      return game_controller if command.downcase == 'back'
-      x, y = parse_choice(command.downcase)
+      command = gets.chomp.downcase
+      return game_controller if command == 'back'
+      x, y = parse_position(command)
       choose_piece(x, y)
     end
   end
 
   def parse_move
-    print "Choose move or type 'back' to choose other piece: "
-    move_choice = gets.chomp
-    return game_controller if move_choice.downcase == 'back'
-    x, y = parse_choice(move_choice.downcase)
-    until move_choice.downcase =~ /^[a-h][1-8]$/ && move(current_piece, x, y) != false
+    print "Choose move or type 'back' to choose another piece: "
+    move_choice = gets.chomp.downcase
+    return game_controller if move_choice == 'back'
+    x, y = parse_position(move_choice)
+    until move_choice =~ /^[a-h][1-8]$/ && move(current_piece, x, y) != false
       print "Invalid move! Try again or type 'back' to return: "
-      move_choice = gets.chomp
-      return game_controller if move_choice.downcase == 'back'
-      x, y = parse_choice(move_choice.downcase)
+      move_choice = gets.chomp.downcase
+      return game_controller if move_choice == 'back'
+      x, y = parse_position(move_choice)
     end
+  end
+
+  def parse_position(position)
+    x = position[0].ord - 97
+    y = position[1].to_i - 1
+    [x, y]
+  end
+
+  def prepare_next_move
+    rescue_moves = [] unless is_check?
+    self.last_move = nil unless !last_move.nil? && last_move[:piece].color ==  current_player.color
+    self.current_player, self.other_player = self.other_player, self.current_player
+  end
+  
+  def save_game_controller
+    begin
+      save_game
+      puts "Game saved successfully!"
+    rescue
+      puts "Unable to save the game!"
+    end
+    game_controller
+  end
+
+  def start_game
+    puts "Welcome to the Chess Game!"
+    puts "Type: 'start' to start new game\n      'load' to load saved game\n      'quit' to exit"
+    commands = ['start', 'load', 'quit']
+    print ">> "
+    command = gets.chomp.downcase
+    loop do
+      case command
+      when "start"
+        new_game
+      when "load"
+        load_game
+      when "quit"
+        exit
+      else
+        print "Invalid command. Try again: "
+        command = gets.chomp.downcase
+      end
+    end
+  end
+
+  def new_game
+    print "Enter name of the first player (white set): "
+    p1_name = gets.chomp
+    print "Enter name of the second player (black set): "
+    p2_name = gets.chomp
+    create_players(p1_name, p2_name)
+
+    game_controller
+  end
+
+  def handle_checks(check, mate)
+    if check && mate
+      puts "\nCheckmate!"
+      exit
+    elsif check
+      puts "\nCheck!"
+    elsif mate
+      puts "\nStalemate!"
+      exit
+    else
+      puts ""
+    end      
   end
 
   def game_controller
@@ -258,41 +353,26 @@ class Board
     puts ""    
     loop do
       puts "It's #{current_player.name}'s turn."
-      print "Choose piece, type 'save' to save game or 'quit' to exit: "
       command = parse_command
-      if command == 'save'
-        begin
-          save_game
-          puts "Game saved successfully!"
-        rescue
-          puts "Unable to save the game!"
-        end
-        return game_controller
+      case command
+      when 'save'
+        save_game_controller
+      when 'quit'
+        exit
+      else
+        x, y = parse_position(command)
       end
-      exit if command == 'quit'
-      x, y = parse_choice(command)
       choose_piece(x, y)
       parse_piece
       parse_move
       update_board
       draw_board
       rescue_moves = []
-      print "\nCheck" if is_check?
-      if is_mate?
-        puts "mate!"
-        exit
-      end 
-      puts is_check? ? "!" : ""
-      rescue_moves = [] unless is_check?
-      self.last_move = nil unless !last_move.nil? && last_move[:piece].color ==  current_player.color
-      self.current_player, self.other_player = self.other_player, self.current_player
+      check = is_check?
+      mate = is_mate?
+      handle_checks(check, mate)
+      prepare_next_move
     end
-  end
-
-  def parse_choice(position)
-    x = position[0].ord - 97
-    y = position[1].to_i - 1
-    [x, y]
   end
 
   def save_game

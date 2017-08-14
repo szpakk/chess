@@ -1,14 +1,14 @@
 class Player
-  @@count = 0
+  attr_accessor :set
+  attr_reader   :color, :name
 
-  attr_accessor :name, :set
-  attr_reader   :color
+  @count = 0
 
   def initialize(name)
     @name = name
-    @color = @@count.even? ? 'white' : 'black'
+    @color = Player.count.even? ? 'white' : 'black'
     y = @color == 'white' ? 0 : 7
-    @@count += 1
+    Player.count += 1
     @set = [King.new(@color, y), Queen.new(@color, y), Rook.new(@color, 0, y),
             Rook.new(@color, 7, y), Knight.new(@color, 1, y), Knight.new(@color, 6, y),
             Bishop.new(@color, 2, y), Bishop.new(@color, 5, y)]
@@ -21,5 +21,13 @@ class Player
 
   def king_y
     set[0].y
+  end
+
+  def self.count
+    @count
+  end
+
+  def self.count=(number)
+    @count = number
   end
 end
