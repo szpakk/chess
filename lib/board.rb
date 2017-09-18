@@ -17,14 +17,14 @@ class Board
     spacing = "   "
     even_line = Array.new(4, [spacing.colorize(:background => :blue), spacing.colorize(:background => :light_blue)]).flatten
     odd_line = even_line.reverse
-    8.times { |index| index.even? ? board << even_line[0..-1] : board << odd_line[0..-1] }
+    8.times { |i| i.even? ? board << even_line[0..-1] : board << odd_line[0..-1] }
     board
   end
 
   def draw_board
     puts "\n   a  b  c  d  e  f  g  h "
-    board.reverse.each_with_index do |row, index|
-      puts "#{8 - index}|#{row[0]}#{row[1]}#{row[2]}#{row[3]}#{row[4]}#{row[5]}#{row[6]}#{row[7]}|#{8 - index}"
+    board.reverse.each_with_index do |row, i|
+      puts "#{8 - i}|#{row[0]}#{row[1]}#{row[2]}#{row[3]}#{row[4]}#{row[5]}#{row[6]}#{row[7]}|#{8 - i}"
     end
     puts "   a  b  c  d  e  f  g  h "
   end
@@ -232,9 +232,9 @@ class Board
     mate = true
 
     # checking if any opponent move can prevent mate
-    other_player.set.size.times do |index|
-      other_player.set[index].potential_moves.each do |x, y|
-        self.temp_piece = other_player.set[index]
+    other_player.set.size.times do |i|
+      other_player.set[i].potential_moves.each do |x, y|
+        self.temp_piece = other_player.set[i]
         self.temp_x, self.temp_y = x, y
         move
         update_board

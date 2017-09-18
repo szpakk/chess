@@ -79,7 +79,9 @@ describe Board do
         @board.player2.set[1].position = [4, 1]
         @board.player2.set[2].position = [4, 3]
         @board.update_board
-        @board.move(@board.player2.set[3], 6, 4)
+        @board.temp_piece = @board.player2.set[3]
+        @board.temp_x, @board.temp_y = 6, 4
+        @board.move
         @board.update_board
 
         @board.current_player, @board.other_player = @board.player2, @board.player1

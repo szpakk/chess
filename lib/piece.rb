@@ -22,12 +22,12 @@ class Piece
       x_pos = x + i
       y_neg = y - i
       x_neg = x - i
-      moves << [x_pos, y_pos] if x_pos.between?(0,7) && y_pos.between?(0,7)
-      moves << [x_neg, y_pos] if x_neg.between?(0,7) && y_pos.between?(0,7)
-      moves << [x_neg, y_neg] if x_neg.between?(0,7) && y_neg.between?(0,7)
-      moves << [x_pos, y_neg] if x_pos.between?(0,7) && y_neg.between?(0,7)
+      moves << [x_pos, y_pos]
+      moves << [x_neg, y_pos]
+      moves << [x_neg, y_neg]
+      moves << [x_pos, y_neg]
     end
-    moves
+    moves.select! { |x, y| x.between?(0, 7) && y.between?(0, 7) }
   end
 
   def straight_moves
